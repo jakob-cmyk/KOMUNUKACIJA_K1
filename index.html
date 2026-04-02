@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="sl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Komunikacijski simulator — NRZ · CRC-32 · Hamming · BPSK</title>
+<style>
+  :root {
+    --bg:#ffffff;--bg2:#f5f5f3;--bg3:#eeede9;
+    --text:#1a1a18;--text2:#6b6b66;--text3:#9c9a92;
+    --border:rgba(0,0,0,0.1);--border2:rgba(0,0,0,0.2);
+    --blue-bg:#e6f1fb;--blue-text:#0c447c;
+    --orange-bg:#faeeda;--orange-text:#633806;
+    --green-bg:#eaf3de;--green-text:#27500a;
+    --r:8px;--rl:12px;--mono:'Courier New',monospace;
+    --sans:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;
+  }
+  @media(prefers-color-scheme:dark){
+    :root{
+      --bg:#1c1c1a;--bg2:#252523;--bg3:#2e2e2b;
+      --text:#e8e6df;--text2:#9c9a92;--text3:#6b6b66;
+      --border:rgba(255,255,255,0.08);--border2:rgba(255,255,255,0.18);
+      --blue-bg:#042c53;--blue-text:#b5d4f4;
+      --orange-bg:#412402;--orange-text:#fac775;
+      --green-bg:#173404;--green-text:#c0dd97;
+    }
+  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:var(--sans);background:var(--bg3);color:var(--text);min-height:100vh;padding:2rem 1rem}
+  .page{max-width:820px;margin:0 auto}
+  header{display:flex;align-items:baseline;gap:16px;margin-bottom:1.75rem;flex-wrap:wrap}
+  h1{font-size:20px;font-weight:500}
+  .chips{display:flex;gap:6px;flex-wrap:wrap}
+  .chip{font-size:11px;font-weight:500;padding:2px 9px;border-radius:20px}
+  .c-blue{background:var(--blue-bg);color:var(--blue-text)}
+  .c-orange{background:var(--orange-bg);color:var(--orange-text)}
+  .c-green{background:var(--green-bg);color:var(--green-text)}
+  .c-gray{background:var(--bg2);color:var(--text2);border:0.5px solid var(--border2)}
+
+  .ctrl{display:flex;gap:8px;margin-bottom:1.5rem;flex-wrap:wrap}
+  .ctrl input{flex:1;min-width:200px;font-family:var(--mono);font-size:13px;
+    background:var(--bg);border:0.5px solid var(--border2);border-radius:var(--r);
+    padding:8px 11px;color:var(--text);outline:none}
+  .ctrl input:focus{border-color:#185fa5}
+  button{padding:8px 16px;border-radius:var(--r);border:0.5px solid var(--border2);
+    background:transparent;color:var(--text);font-size:13px;cursor:pointer;transition:all .15s}
+  button:hover{background:var(--bg2)}
+
+  .pipe{display:flex;flex-direction:column;gap:2px}
+  .stage{background:var(--bg);border:0.5px solid var(--border);padding:1rem 1.25rem}
+  .pipe>.stage:first-child{border-radius:var(--rl) var(--rl) 4px 4px}
+  .pipe>.stage:last-child{border-radius:4px 4px var(--rl) var(--rl)}
+  .pipe>.stage:only-child{border-radius:var(--rl)}
+  .shdr{display:flex;align-items:center;gap:8px;margin-bottom:10px}
+  .stitle{font-size:13px;font-weight:500;color:var(--text)}
+  .smeta{font-size:11px;color:var(--text3);font-family:var(--mono);margin-left:auto}
+  .lbl{font-size:10px;color:var(--text2);margin-bottom:3px}
+  .bits{font-family:var(--mono);font-size:11px;line-height:1.75;word-break:break-all;
+    background:var(--bg2);border-radius:var(--r);padding:8px 10px;margin-top:4px}
+  .b1{color:#185fa5;font-weight:500}.b0{color:var(--text3)}.bp{color:#d85a30;font-weight:500}
+  .crc-hex{font-family:var(--mono);font-size:15px;font-weight:500;color:#d85a30;margin-bottom:4px}
+  .hgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(76px,1fr));gap:5px;margin-top:6px}
+  .hblk{background:var(--bg2);border-radius:6px;padding:5px 7px;font-size:11px;font-family:var(--mono)}
+  .hblk-l{font-size:9px;color:var(--text2);font-family:var(--sans);margin-bottom:2px}
+  canvas{display:block;width:100%;border-radius:6px;background:var(--bg2)}
+  .row2{display:grid;grid-template-columns:2fr 1fr;gap:8px;margin-top:4px}
+  .snr-row{display:flex;align-items:center;gap:8px;margin-top:8px}
+  .snr-row label{font-size:11px;color:var(--text2);white-space:nowrap}
+  input[type=range]{flex:1;accent-color:#185fa5;cursor:pointer}
+  .snrv{font-size:12px;font-weight:500;font-family:var(--mono);min-width:40px}
+  .ber{font-size:12px;font-weight:500;font-family:var(--mono);padding:2px 9px;
+    border-radius:6px;background:var(--blue-bg);color:var(--blue-text)}
+  .arr{text-align:center;color:var(--text3);font-size:12px;padding:1px 0;line-height:1}
+  .stats{display:grid;grid-template-columns:repeat(4,1fr);gap:6px;margin-top:4px}
+  .stat{background:var(--bg2);border-radius:var(--r);padding:7px 10px}
+  .stat-l{font-size:10px;color:var(--text2)}
+  .stat-v{font-size:15px;font-weight:500;color:var(--text);font-family:var(--mono)}
+  footer{margin-top:1.5rem;text-align:center;font-size:11px;color:var(--text3)}
+  @media(max-width:500px){.stats{grid-template-columns:1fr 1fr}.row2{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="page">
+
+<header>
+  <h1>Komunikacijski simulator</h1>
+  <div class="chips">
+    <span class="chip c-gray">NRZ</span>
+    <span class="chip c-blue">CRC-32</span>
+    <span class="chip c-orange">Hamming (7,4)</span>
+    <span class="chip c-blue">BPSK</span>
+  </div>
+</header>
+
+<div class="ctrl">
+  <input type="text" id="msg" value="Aleš Novak E300400500 Slovenija" placeholder="Vpiši sporočilo...">
+  <button onclick="run()">Simuliraj</button>
+</div>
+
+<div class="pipe">
+
+  <div class="stage">
+    <div class="shdr">
+      <span class="chip c-gray">TX</span>
+      <span class="stitle">Vhodno sporočilo — ASCII biti</span>
+      <span class="smeta" id="s0m"></span>
+    </div>
+    <div class="bits" id="s0b"></div>
+  </div>
+
+  <div class="arr">↓</div>
+
+  <div class="stage">
+    <div class="shdr">
+      <span class="chip c-blue">CRC-32</span>
+      <span class="stitle">Zaščitno kodiranje</span>
+      <span class="smeta" id="s1m"></span>
+    </div>
+    <div class="crc-hex" id="s1h"></div>
+    <div class="lbl">32-bitna popotnica (generator: 0xEDB88320 — IEEE 802.3)</div>
+    <div class="bits" id="s1b"></div>
+  </div>
+
+  <div class="arr">↓</div>
+
+  <div class="stage">
+    <div class="shdr">
+      <span class="chip c-orange">Hamming (7,4)</span>
+      <span class="stitle">Kanalsko kodiranje</span>
+      <span class="smeta" id="s2m"></span>
+    </div>
+    <div class="lbl"><span style="color:#d85a30">■</span> pariteta &nbsp;<span style="color:#185fa5">■</span> podatki &nbsp;— prvih 8 blokov</div>
+    <div class="hgrid" id="s2g"></div>
+  </div>
+
+  <div class="arr">↓</div>
+
+  <div class="stage">
+    <div class="shdr">
+      <span class="chip c-gray">NRZ</span>
+      <span class="stitle">Nivojska predstavitev signala</span>
+      <span class="smeta" id="s3m"></span>
+    </div>
+    <div class="lbl">Prvih 64 bitov kodiranega zaporedja</div>
+    <canvas id="nrz" height="60"></canvas>
+  </div>
+
+  <div class="arr">↓</div>
+
+  <div class="stage">
+    <div class="shdr">
+      <span class="chip c-blue">BPSK</span>
+      <span class="stitle">Modulacija — fazna modulacija</span>
+      <span class="smeta" id="s4m"></span>
+    </div>
+    <div class="row2">
+      <div>
+        <div class="lbl">Moduliran signal — bit 1: faza 0°, bit 0: faza 180°</div>
+        <canvas id="bpsk" height="72"></canvas>
+      </div>
+      <div>
+        <div class="lbl">Konstelacijski diagram</div>
+        <canvas id="const" height="72"></canvas>
+      </div>
+    </div>
+    <div class="snr-row">
+      <label>SNR (dB)</label>
+      <input type="range" min="0" max="20" value="10" step="1" id="snr" oninput="onSNR(this.value)">
+      <span class="snrv" id="snrv">10 dB</span>
+      <span class="ber" id="berv">BER: —</span>
+    </div>
+  </div>
+
+  <div class="arr">↓</div>
+
+  <div class="stage">
+    <div class="shdr">
+      <span class="chip c-green">RX — sprejemnik</span>
+      <span class="stitle">Statistika paketa</span>
+    </div>
+    <div class="stats" id="stats"></div>
+  </div>
+
+</div>
+
+<footer>Fizična plast · Kolokvij 1 · NRZ · CRC-32 · Hamming (7,4) · BPSK</footer>
+</div>
+
+<script>
+function s2b(s){
+  let b=[];
+  for(let i=0;i<s.length;i++){
+    let c=s.charCodeAt(i).toString(2).padStart(8,'0');
+    for(let x of c)b.push(+x);
+  }
+  return b;
+}
+function crc32(bits){
+  let bytes=[];
+  for(let i=0;i<bits.length;i+=8){
+    let B=0;for(let j=0;j<8;j++)B=(B<<1)|(bits[i+j]||0);bytes.push(B);
+  }
+  let crc=0xFFFFFFFF,p=0xEDB88320;
+  for(let B of bytes){crc^=B;for(let k=0;k<8;k++)crc=(crc&1)?(crc>>>1)^p:crc>>>1;}
+  crc=(crc^0xFFFFFFFF)>>>0;
+  let cb=[];for(let i=31;i>=0;i--)cb.push((crc>>i)&1);
+  return{crc,cb};
+}
+function henc(n){
+  const[d1,d2,d3,d4]=n;
+  return[d1^d2^d4,d1^d3^d4,d1,d2^d3^d4,d2,d3,d4];
+}
+function erfc(x){
+  const t=1/(1+0.3275911*Math.abs(x));
+  const y=1-(((((1.061405429*t-1.453152027)*t)+1.421413741)*t-0.284496736)*t+0.254829592)*t*Math.exp(-x*x);
+  return x>=0?1-y:1+y;
+}
+function berCalc(db){return 0.5*erfc(Math.sqrt(2*Math.pow(10,db/10))/Math.sqrt(2))}
+function berStr(v){return v<1e-10?'< 10⁻¹⁰':v.toExponential(2)}
+
+function bHtml(bits,max,ppos){
+  return bits.slice(0,max).map((b,i)=>
+    ppos&&ppos.includes(i)?`<span class="bp">${b}</span>`:`<span class="${b?'b1':'b0'}">${b}</span>`
+  ).join('')+(bits.length>max?` <span style="color:var(--text3,#9c9a92)">+${bits.length-max} bit</span>`:'');
+}
+
+function drawNRZ(id,bits,h){
+  const c=document.getElementById(id);
+  const W=c.offsetWidth||800;c.width=W;c.height=h;
+  const ctx=c.getContext('2d');ctx.clearRect(0,0,W,h);
+  const n=Math.min(bits.length,64),bw=W/n;
+  ctx.strokeStyle='rgba(128,128,128,0.1)';ctx.lineWidth=.5;
+  ctx.beginPath();ctx.moveTo(0,h/2);ctx.lineTo(W,h/2);ctx.stroke();
+  ctx.strokeStyle='#185fa5';ctx.lineWidth=1.8;ctx.beginPath();
+  for(let i=0;i<n;i++){
+    const y=bits[i]?h*.14:h*.86;
+    if(!i)ctx.moveTo(0,y);
+    else{const py=bits[i-1]?h*.14:h*.86;if(py!==y){ctx.lineTo(i*bw,py);ctx.lineTo(i*bw,y);}}
+    ctx.lineTo((i+1)*bw,y);
+  }
+  ctx.stroke();
+  ctx.font='9px monospace';
+  for(let i=0;i<Math.min(n,32);i++){
+    ctx.fillStyle=bits[i]?'#185fa5':'#d85a30';
+    ctx.fillText(bits[i],i*bw+bw/2-3,bits[i]?h*.14-4:h*.86+11);
+  }
+}
+
+function drawBPSK(id,bits,h){
+  const c=document.getElementById(id);
+  const W=c.offsetWidth||500;c.width=W;c.height=h;
+  const ctx=c.getContext('2d');ctx.clearRect(0,0,W,h);
+  const n=Math.min(bits.length,32),samp=18,tot=n*samp;
+  ctx.strokeStyle='rgba(128,128,128,0.1)';ctx.lineWidth=.5;
+  ctx.beginPath();ctx.moveTo(0,h/2);ctx.lineTo(W,h/2);ctx.stroke();
+  ctx.fillStyle='rgba(216,90,48,0.07)';
+  for(let i=0;i<n;i++){if(!bits[i])ctx.fillRect(i*(W/n),0,W/n,h);}
+  ctx.strokeStyle='#d85a30';ctx.lineWidth=1.5;ctx.beginPath();
+  for(let s=0;s<tot;s++){
+    const bi=Math.floor(s/samp),ph=bits[bi]?0:Math.PI,t=s/samp;
+    const y=h/2-(h*.36)*Math.cos(2*Math.PI*3.5*t/samp+ph);
+    if(!s)ctx.moveTo(0,y);else ctx.lineTo(s*(W/tot),y);
+  }
+  ctx.stroke();
+  ctx.font='9px monospace';
+  for(let i=0;i<n;i++){
+    ctx.fillStyle=bits[i]?'#185fa5':'#d85a30';
+    ctx.fillText(bits[i],i*(W/n)+3,10);
+  }
+}
+
+function drawConst(id,bits,snrL,h){
+  const c=document.getElementById(id);
+  const W=c.offsetWidth||180;c.width=W;c.height=h;
+  const ctx=c.getContext('2d');ctx.clearRect(0,0,W,h);
+  ctx.strokeStyle='rgba(128,128,128,0.15)';ctx.lineWidth=.5;
+  ctx.beginPath();ctx.moveTo(W/2,0);ctx.lineTo(W/2,h);ctx.stroke();
+  ctx.beginPath();ctx.moveTo(0,h/2);ctx.lineTo(W,h/2);ctx.stroke();
+  const noise=snrL?1/Math.sqrt(2*snrL):0.4;
+  for(let i=0;i<Math.min(bits.length,80);i++){
+    const ix=bits[i]?1:-1;
+    const nx=ix+(Math.random()-.5)*noise*2.2;
+    const ny=(Math.random()-.5)*noise*2.2;
+    ctx.beginPath();ctx.arc(W/2+nx*W*.3,h/2+ny*h*.55,2,0,2*Math.PI);
+    ctx.fillStyle=bits[i]?'#185fa5':'#d85a30';ctx.globalAlpha=.8;ctx.fill();ctx.globalAlpha=1;
+  }
+  ctx.font='10px monospace';
+  ctx.fillStyle='#185fa5';ctx.fillText('1',W*.68,h/2-4);
+  ctx.fillStyle='#d85a30';ctx.fillText('0',W*.08,h/2-4);
+}
+
+let HB=[];
+
+function run(){
+  const msg=document.getElementById('msg').value||'Aleš Novak E300400500 Slovenija';
+  const raw=s2b(msg);
+
+  document.getElementById('s0m').textContent=raw.length+' bit';
+  document.getElementById('s0b').innerHTML=bHtml(raw,192);
+
+  const{crc,cb}=crc32(raw);
+  const hex=crc.toString(16).toUpperCase().padStart(8,'0');
+  const prot=[...raw,...cb];
+  document.getElementById('s1m').textContent=prot.length+' bit';
+  document.getElementById('s1h').textContent='0x'+hex;
+  document.getElementById('s1b').innerHTML=
+    bHtml(raw,128)+
+    '<span style="color:var(--text3,#9c9a92)"> │ </span>'+
+    bHtml(cb,32);
+
+  HB=[];
+  const nibs=[];
+  for(let i=0;i<prot.length;i+=4){
+    const n=prot.slice(i,i+4);while(n.length<4)n.push(0);nibs.push(n);
+  }
+  nibs.forEach(n=>HB.push(...henc(n)));
+  document.getElementById('s2m').textContent=nibs.length+' blokov · '+HB.length+' bit';
+  const g=document.getElementById('s2g');g.innerHTML='';
+  nibs.slice(0,8).forEach((n,idx)=>{
+    const e=henc(n),el=document.createElement('div');
+    el.className='hblk';
+    el.innerHTML=`<div class="hblk-l">blok ${idx+1}</div>`+
+      e.map((b,i)=>`<span class="${[0,1,3].includes(i)?'bp':'b1'}">${b}</span>`).join('');
+    g.appendChild(el);
+  });
+
+  document.getElementById('s3m').textContent='64 / '+HB.length+' bit prikazano';
+  document.getElementById('s4m').textContent='bit 1 → 0° | bit 0 → 180°';
+
+  const snrV=+document.getElementById('snr').value;
+  const snrL=Math.pow(10,snrV/10);
+
+  setTimeout(()=>{
+    drawNRZ('nrz',HB,60);
+    drawBPSK('bpsk',HB,72);
+    drawConst('const',HB,snrL,72);
+  },40);
+
+  onSNR(snrV,false);
+
+  document.getElementById('stats').innerHTML=
+    `<div class="stat"><div class="stat-l">znakov</div><div class="stat-v">${msg.length}</div></div>`+
+    `<div class="stat"><div class="stat-l">bit surovo</div><div class="stat-v">${raw.length}</div></div>`+
+    `<div class="stat"><div class="stat-l">bit + CRC-32</div><div class="stat-v">${prot.length}</div></div>`+
+    `<div class="stat"><div class="stat-l">bit + Hamming</div><div class="stat-v">${HB.length}</div></div>`;
+}
+
+function onSNR(v,redraw=true){
+  document.getElementById('snrv').textContent=v+' dB';
+  document.getElementById('berv').textContent='BER: '+berStr(berCalc(+v));
+  if(redraw&&HB.length)drawConst('const',HB,Math.pow(10,v/10),72);
+}
+
+run();
+</script>
+</body>
+</html>
